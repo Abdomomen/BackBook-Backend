@@ -6,6 +6,7 @@ const hpp = require("hpp");
 const compression = require("compression");
 const morgan = require("morgan");
 const app = express();
+app.set("trust proxy", 1); // Trust first proxy (Back4app uses a load balancer)
 const userRouter = require("./routes/user.route");
 const postRouter = require("./routes/post.route");
 const commentRouter = require("./routes/comment.route");
