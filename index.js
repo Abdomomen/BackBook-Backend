@@ -12,24 +12,42 @@ require("dotenv").config();
 
 const app = express();
 
-// 1. Log every request to see if it reaches the server
+// 1. Log every request
 app.use((req, res, next) => {
-  console.log(`>>> Incoming Request: ${req.method} ${req.url}`);
+  console.log(`>>> [${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
-// 2. Permissive CORS for debugging
+// 2. Explicitly handle OPTIONS preflight for all routes
 app.use(
   cors({
     origin: true,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Cookie",
+    ],
   }),
 );
 
-// 3. Trust Proxy for Back4app
-app.set("trust proxy", 1);
+app.options("*", cors()); // Enable pre-flight for all routes
+
+// 3. Health Check (Move to top)
+app.get("/", (req, res) => {
+  res
+    .status(200)
+    .json({
+      status: "alive",
+      message: "BackBook API is running perfectly! 🚀",
+    });
+});
 
 // 4. Middlewares
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
@@ -38,16 +56,7 @@ app.use(mongoSanitize());
 app.use(hpp());
 app.use(compression());
 
-// 5. Health Check at Root
-app.get("/", (req, res) => {
-  res.status(200).send("BackBook API is running perfectly! 🚀");
-});
-
-// 6. Static Files
-app.use("/postImages", express.static(path.join(__dirname, "postImages")));
-app.use("/userImages", express.static(path.join(__dirname, "userImages")));
-
-// 7. Routes (No rate limiters for now to eliminate variables)
+// 5. Routes
 const userRouter = require("./routes/user.route");
 const postRouter = require("./routes/post.route");
 const commentRouter = require("./routes/comment.route");
@@ -57,6 +66,16 @@ app.use("/api/users", userRouter);
 app.use("/api/posts", postRouter);
 app.use("/api/comments", commentRouter);
 app.use("/api/notifications", notificationRouter);
+
+// 6. Static Files
+app.use("/postImages", express.static(path.join(__dirname, "postImages")));
+app.use("/userImages", express.static(path.join(__dirname, "userImages")));
+
+// 7. 404 Handler for undefined routes
+app.use((req, res) => {
+  console.log(`404 ERROR: Path ${req.url} not found`);
+  res.status(404).json({ error: "Route not found", path: req.url });
+});
 
 // 8. Error Handling
 const { errorHandler } = require("./middlewares/errors");
