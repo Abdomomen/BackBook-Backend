@@ -12,45 +12,40 @@ require("dotenv").config();
 
 const app = express();
 
-// 1. Log every request
+// 1. Log every request and handle CORS manually
+app.use(morgan("dev")); // Move morgan to the top
 app.use((req, res, next) => {
   console.log(`>>> [${new Date().toISOString()}] ${req.method} ${req.url}`);
+
+  // Manual CORS
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With, Accept, Cookie",
+  );
+
+  if (req.method === "OPTIONS") {
+    console.log(">>> Responding to OPTIONS request");
+    return res.status(200).end();
+  }
   next();
 });
 
-// 2. Explicitly handle OPTIONS preflight for all routes
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-      "Cookie",
-    ],
-  }),
-);
-
-app.options("*", cors()); // Enable pre-flight for all routes
-
-// 3. Health Check (Move to top)
+// 2. Health Check (Move to top)
 app.get("/", (req, res) => {
-  res
-    .status(200)
-    .json({
-      status: "alive",
-      message: "BackBook API is running perfectly! 🚀",
-    });
+  console.log(">>> Root route / hit!");
+  res.status(200).json({
+    status: "alive",
+    message: "BackBook API is running perfectly! 🚀",
+  });
 });
 
 // 4. Middlewares
 app.set("trust proxy", 1);
 app.use(express.json({ limit: "10kb" }));
 app.use(cookieParser());
-app.use(morgan("dev"));
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(mongoSanitize());
 app.use(hpp());
