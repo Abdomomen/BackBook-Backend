@@ -29,34 +29,24 @@ const connectDB = async () => {
 };
 
 // --- Security & Basics ---
-const allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
-if (process.env.CLIENT_URL) {
-  allowedOrigins.push(process.env.CLIENT_URL.replace(/\/$/, "")); // Remove trailing slash if exists
-}
-
 app.use(
   cors({
-    credentials: true,
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      // Clean the incoming origin to compare properly
-      const cleanedOrigin = origin.replace(/\/$/, "");
-
-      const isAllowed =
-        allowedOrigins.includes(cleanedOrigin) ||
-        cleanedOrigin.endsWith(".vercel.app"); // Allow all vercel deployments
-
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        console.log("Blocking Origin:", origin); // Log for debugging
-        callback(new Error("Not allowed by CORS"));
-      }
+      // Allow all origins for now to fix the blockage, then we will restrict.
+      // This is the most reliable way to debug if CORS is the real issue.
+      callback(null, true);
     },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+    ],
   }),
 );
+
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
