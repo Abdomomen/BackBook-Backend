@@ -12,26 +12,65 @@ require("dotenv").config();
 
 const app = express();
 
-// 1. Log every request and handle CORS manually
-app.use(morgan("dev")); // Move morgan to the top
-app.use((req, res, next) => {
-  console.log(`>>> [${new Date().toISOString()}] ${req.method} ${req.url}`);
+// --- CORS Configuration ---
+// Normalize URLs by removing trailing slashes
+const normalizeUrl = (url) => {
+  if (!url) return null;
+  return url.replace(/\/$/, "").trim();
+};
 
-  // Manual CORS
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Accept, Cookie",
-  );
-
-  if (req.method === "OPTIONS") {
-    console.log(">>> Responding to OPTIONS request");
-    return res.status(200).end();
+// Build allowed origins array
+const baseOrigins = ["http://localhost:3001"];
+if (process.env.CLIENT_URL) {
+  const clientUrl = normalizeUrl(process.env.CLIENT_URL);
+  baseOrigins.push(clientUrl);
+  // Also add without protocol to catch any variations
+  const urlWithoutProtocol = clientUrl.replace(/^https?:\/\//, "");
+  if (urlWithoutProtocol !== clientUrl) {
+    baseOrigins.push(`https://${urlWithoutProtocol}`);
+    baseOrigins.push(`http://${urlWithoutProtocol}`);
   }
-  next();
-});
+}
+
+const allowedOrigins = baseOrigins.map(normalizeUrl).filter(Boolean);
+
+// Log allowed origins for debugging
+console.log("=== CORS Configuration ===");
+console.log("CLIENT_URL from env:", process.env.CLIENT_URL);
+console.log("Allowed CORS origins:", allowedOrigins);
+console.log("========================");
+
+app.use(
+  cors({
+    credentials: true,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, Postman, etc.)
+      if (!origin) {
+        console.log("Request with no origin - allowing");
+        return callback(null, true);
+      }
+
+      // Normalize the incoming origin
+      const normalizedOrigin = normalizeUrl(origin);
+      
+      // Check if origin is allowed
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        console.log(`CORS: Allowing origin: ${normalizedOrigin}`);
+        callback(null, true);
+      } else {
+        console.log(`CORS: Blocked origin: ${normalizedOrigin}`);
+        console.log(`CORS: Allowed origins are: ${allowedOrigins.join(", ")}`);
+        callback(new Error(`Not allowed by CORS. Origin: ${normalizedOrigin}`));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Cookie"],
+    exposedHeaders: ["Set-Cookie"],
+  }),
+);
+
+// 1. Log every request
+app.use(morgan("dev"));
 
 // 2. Health Check (Move to top)
 app.get("/", (req, res) => {
